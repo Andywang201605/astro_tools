@@ -21,6 +21,6 @@ obs = ATCA_obs(target, tzinfo='Australia/Sydney', portal_htmls=portal_htmls)
 fig, ax = obs.plot_target_altitude_with_schedule(t, duration=timedelta(days=10), dateformat='%D-%H:%M')
 fig, ax = obs.plot_single_observability_heatmap(t, days=7, target_index=0)
 ```
-By default, we observed in Australia/Sydney timezone. All the time in the plot is based on the `tzinfo` when you initiate your ATCA_obs object
+By default, we observe in Australia/Sydney timezone. All the time in the plot is based on the `tzinfo` when you initiate your ATCA_obs object
 
 There is `timezone` information in the schedule, we've already considered that in the code.

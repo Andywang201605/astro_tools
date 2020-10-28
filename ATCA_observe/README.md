@@ -2,7 +2,8 @@
 
 **STEP 1**
 Download ATCA schedules from ATCA observing portal. Since the code is semi-automatic, you need to download it mannually week by week.
-*REMEMBER* to save as `webpage,complete`, even though we only need the `.html` file
+
+*REMEMBER* to save the webpage as `webpage,complete`, even though we only need the `.html` file
 
 **STEP 2**
 Example:

@@ -1,17 +1,16 @@
 import astropy.units as u
-from astropy.coordinates import EarthLocation
-from pytz import timezone
-from astroplan import Observer
-import numpy as np
-import matplotlib.pyplot as plt
+from astropy.coordinates import EarthLocation,SkyCoord
 
-from astroplan import FixedTarget
+from pytz import timezone
+import numpy as np
 from collections import Sequence
 
-from astropy.coordinates import SkyCoord
-from astropy.time import Time
-
+import matplotlib.pyplot as plt
 from matplotlib import dates
+
+from astroplan import Observer
+from astroplan import FixedTarget
+
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup as bs

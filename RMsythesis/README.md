@@ -2,6 +2,8 @@
 
 credit: Emil Lenc
 
+For detail of RM-synthesis, check slides here! https://www.mpifr-bonn.mpg.de/1294972/Heald.pdf
+
 #### rmsynth.py
 
 Script for making an RM-synthesized map from image cubes made by `wsclean`.

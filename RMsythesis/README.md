@@ -2,7 +2,7 @@
 
 credit: Emil Lenc
 
-For detail of RM-synthesis, check slides here! https://www.mpifr-bonn.mpg.de/1294972/Heald.pdf
+Check slides here for a detailed description for RM-synthesis! https://www.mpifr-bonn.mpg.de/1294972/Heald.pdf
 
 #### rmsynth.py
 

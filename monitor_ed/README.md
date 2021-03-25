@@ -1,4 +1,4 @@
-## Scripts for monitoring ED
+## Scripts for monitoring Ed
 
 This code is used for monitoring Ed (at least for me)
 

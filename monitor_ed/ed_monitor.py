@@ -361,7 +361,7 @@ def _manually_check():
         os.remove(OLDPICKLEPATH)
         os.remove('./Class_status.png')
         
-    print('Thanks James!'.center(70, '-'))
+    print('Have a nice day!'.center(70, '-'))
     
 if __name__ == '__main__':
     _manually_check()

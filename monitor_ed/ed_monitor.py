@@ -100,7 +100,7 @@ def _find_inputbox(driver, timeout=30):
             tnow = datetime.now()
             if (tnow - tstart).total_seconds() > timeout:
                 raise TimeoutError('Check out your connection!')
-            sleep(1)
+            sleep(0.3)
             
 def _search_tut(inputbox, tutcode):
     '''
@@ -320,7 +320,7 @@ def _print_new_attempted(analytics_df, analytics_html, rowcols):
     print('*'*70)
     
 def _print_gone_attempted(analytics_df, rowcols):
-    print('THESE ATTEMPTS ARE GONE'.center(70, '*'))
+    print('THESE ATTEMPTS ARE SOLVED'.center(70, '*'))
     for row, col in rowcols:
         print('{} finished {}!'.format(analytics_df.iloc[row, 0],
                                        analytics_df.columns[col]))
@@ -359,6 +359,78 @@ def _compare_analytics_dfs(analytics_df, analytics_html, oldpath='./old_analytic
         rowcols = _get_value_rowcol(newatt_, True)
         _print_new_attempted(analytics_df, analytics_html, rowcols)
     analytics_df.to_pickle(oldpath)
+    
+def _get_html_table(analytics_df, analytics_html, rowcols):
+    html_table = []
+    for row, col in rowcols:
+        name = analytics_df.iloc[row, 0]
+        question_name = analytics_df.columns[col]
+        url = analytics_html.iloc[row, col]
+        url = f'<a href="{url}" target="_blank">{url}</a>'
+        html_table.append([name, question_name, url])
+    return pd.DataFrame(html_table, columns=['NAME', 'QUESTION', 'WORKSPACE'])    
+
+def _make_html(analytics_df, analytics_html, oldpath):
+    html_content = ''
+    time_update = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    ### The basic information for the course
+    tut_info = f'''<h2>TUTCODE {TUTCODE} UPDATED @ {time_update}</h2><hr>\n'''
+    html_content += tut_info
+    # if there is no old pickle
+    if not os.path.exists(oldpath):
+        ### new attempts
+        html_content += '<h3>NEW ATTEMPTS</h3>\n'
+        rowcols = _get_value_rowcol(analytics_df, 'attempted')
+        if len(rowcols) != 0:
+            newatt_ = _get_html_table(analytics_df, analytics_html, rowcols)
+            html_content += newatt_.to_html(escape=False)
+        else:
+            html_content += '<p> no new attempts</p>\n'
+        ### 
+        html_content += '<hr><h3>OLD ATTEMPTS</h3>\n'
+        html_content += '<p> no old attempts</p>\n'
+        ### attempts are gone
+        html_content += '<hr><h3>ATTEMPTS SOLVED</h3>\n'
+        html_content += '<p> no old attempts solved</p>\n'
+    else:
+        old_analytics_df = pd.read_pickle(oldpath)
+        oldatttab = old_analytics_df == 'attempted'
+        changetab = analytics_df != old_analytics_df
+        newatttab = analytics_df == 'attempted'
+        ### new attempts
+        html_content += '<h3>NEW ATTEMPTS</h3>\n'
+        newatt_ = (newatttab & changetab)
+        rowcols = _get_value_rowcol(newatt_, True)
+        if len(rowcols) != 0:
+            newatt_ = _get_html_table(analytics_df, analytics_html, rowcols)
+            html_content += newatt_.to_html(escape=False)
+        else:
+            html_content += '<p> no new attempts</p>\n'
+        ### 
+        html_content += '<hr><h3>OLD ATTEMPTS</h3>\n'
+        oldatt_ = (oldatttab & newatttab)
+        rowcols = _get_value_rowcol(oldatt_, True)
+        if len(rowcols) != 0:
+            oldatt_ = _get_html_table(analytics_df, analytics_html, rowcols)
+            html_content += oldatt_.to_html(escape=False)
+        else:
+            html_content += '<p> no old attempts</p>\n'
+        ### attempts are gone
+        html_content += '<hr><h3>ATTEMPTS SOLVED</h3>\n'
+        goneatt_ = (oldatttab & changetab)
+        rowcols = _get_value_rowcol(goneatt_, True)
+        if len(rowcols) != 0:
+            goneatt_ = _get_html_table(analytics_df, analytics_html, rowcols)
+            html_content += goneatt_.to_html(escape=False)
+        else:
+            html_content += '<p> no old attempts solved</p>\n'
+
+    html_content += '<hr>\n'
+    html_content += '<h3>CLASS MONITORING</h3>\n'
+    html_content += '<a href="./Class_status.png"><img src="Class_status.png" width="1000"><\a>'
+
+    with open('monitor.html', 'w', encoding='utf-8') as fp:
+        fp.write(html_content)
     
 def _check_login(driver):
     if 'Log in to continue' in driver.page_source:
@@ -400,11 +472,14 @@ def _manually_check():
         
         ### get analytics dataframe
         while not _check_search_loaded(driver, TUTCODE):
-            sleep(1)
+            sleep(0.3)
         analytics_df, analytics_html, colattrs = _get_analytics_table(driver)
         stats, colnames = _prepare_code_plotting(analytics_df, colattrs)
         _plot_code_status(stats, colnames)
+        _make_html(analytics_df, analytics_html, OLDPICKLEPATH)
         _compare_analytics_dfs(analytics_df, analytics_html, OLDPICKLEPATH)
+        
+        print("Please check './monitor.html' for a webpage version!")
         
         break_sign = input('Type "q" to quit! Press Enter to continue! ')
         print('\n\n')

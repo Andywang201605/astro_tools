@@ -7,11 +7,13 @@ Created on Thu Mar 25 18:17:13 2021
 
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from time import sleep
 import pandas as pd
 import numpy as np
 import os
+import subprocess
 import matplotlib.pyplot as plt
 
 import warnings
@@ -41,8 +43,31 @@ def _start_webdriver(browser, driverpath):
     else:
         raise NotImplementedError(f'Code for {browser} is not implemented')
         
+def _open_browser_cmd(port, cache_dir):
+    '''
+    Open chrome in debugging mode
+    '''
+    chrome_cmd = f'chrome.exe --remote-debugging-port={port} --user-data-dir="{cache_dir}"'
+    subprocess.Popen(chrome_cmd)
+    
+def _connect_selenium(driverpath, port, cache_dir):
+    '''
+    connect your browser to python
+
+    Returns
+    -------
+    driver: Selenium.webdriver object that is connected to your browser
+
+    '''
+    
+    chrome_options = Options()
+    chrome_options.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+    
+    driver = webdriver.Chrome(driverpath, options=chrome_options)
+    
+    return driver
         
-def _find_inputbox(driver, timeout=15):
+def _find_inputbox(driver, timeout=30):
     '''
     Find inputbox element in Ed analytics page
 
@@ -139,6 +164,12 @@ def _get_tdstatus(tdtag):
             return cellclass[1].split('-')[-1]
     return ''
     
+def _get_tdlink(tdtag):
+    atags = tdtag.findAll('a')
+    if len(atags) > 0:
+        return 'https://edstem.org{}'.format(atags[0].attrs['href'])
+    return 'N/A'
+
 def _get_analytics_table(driver):
     '''
     Get analytics table from driver
@@ -172,23 +203,28 @@ def _get_analytics_table(driver):
         colattrs.append(_get_header_use(thtag))
     # body
     tablecells = []
+    tablehtmls = []
 
     trtags = tbody.findAll('tr')
     for trtag in trtags:
         rowcells = []
+        rowhtmls = []
         tdtags = trtag.findAll('td')
         for tdtag in tdtags:
             rowcells.append(_get_tdstatus(tdtag))
+            rowhtmls.append(_get_tdlink(tdtag))
         tablecells.append(rowcells)
+        tablehtmls.append(rowhtmls)
         
     analytics_df = pd.DataFrame(tablecells, columns=header)
+    analytics_html = pd.DataFrame(tablehtmls, columns=header)
     
-    return analytics_df, colattrs
+    return analytics_df, analytics_html, colattrs
 
-def _check_search_loaded(driver):
-    df, _ = _get_analytics_table(driver)
+def _check_search_loaded(driver, tutcode):
+    df, _, _ = _get_analytics_table(driver)
     tutcol = df['Tutorial'].apply(lambda x:x.lower())
-    if (tutcol != TUTCODE.lower()).sum() > 0:
+    if (tutcol != tutcode.lower()).sum() > 0:
         return False
     return True
 
@@ -205,7 +241,7 @@ def _get_code_cols(colattrs):
     '''
     code_check = []
     for attr in colattrs:
-        if attr == '#lesson-slide-code':
+        if attr == '#lesson-slide-code' or attr == '#lesson-slide-postgres':
             code_check.append(True)
         else:
             code_check.append(False)
@@ -274,11 +310,13 @@ def _get_value_rowcol(df, value):
                 rowcols.append((i, j))
     return rowcols
 
-def _print_new_attempted(analytics_df, rowcols):
+def _print_new_attempted(analytics_df, analytics_html, rowcols):
     print('NEW ATTEMPTS'.center(70, '*'))
     for row, col in rowcols:
-        print('{}\t\tattempted\t\t{}!'.format(analytics_df.iloc[row, 0], 
-                                        analytics_df.columns[col]))
+        print('{} attempted {}!\n{}\n'.format(analytics_df.iloc[row, 0], 
+                                            analytics_df.columns[col],
+                                            analytics_html.iloc[row, col]
+                                            ))
     print('*'*70)
     
 def _print_gone_attempted(analytics_df, rowcols):
@@ -288,19 +326,21 @@ def _print_gone_attempted(analytics_df, rowcols):
                                        analytics_df.columns[col]))
     print('*'*70)
     
-def _print_old_attempted(analytics_df, rowcols):
+def _print_old_attempted(analytics_df, analytics_html, rowcols):
     print('OLD ATTEMPTS'.center(70, '*'))
     for row, col in rowcols:
-        print('{} is still trying {}!'.format(analytics_df.iloc[row, 0], 
-                                              analytics_df.columns[col]))
+        print('{} is still trying {}!\n{}\n'.format(analytics_df.iloc[row, 0], 
+                                                  analytics_df.columns[col],
+                                                  analytics_html.iloc[row, col]
+                                                  ))
     print('*'*70)
     
-def _compare_analytics_dfs(analytics_df, oldpath='./old_analytics_df.pickle'):
+def _compare_analytics_dfs(analytics_df, analytics_html, oldpath='./old_analytics_df.pickle'):
     if not os.path.exists(oldpath):
         rowcols = _get_value_rowcol(analytics_df, 'attempted')
         _print_gone_attempted(analytics_df, [])
-        _print_old_attempted(analytics_df, [])
-        _print_new_attempted(analytics_df, rowcols)
+        _print_old_attempted(analytics_df, analytics_html, [])
+        _print_new_attempted(analytics_df, analytics_html, rowcols)
     else:
         old_analytics_df = pd.read_pickle(oldpath)
         oldatttab = old_analytics_df == 'attempted'
@@ -313,11 +353,11 @@ def _compare_analytics_dfs(analytics_df, oldpath='./old_analytics_df.pickle'):
         ### old attempts
         oldatt_ = (oldatttab & newatttab)
         rowcols = _get_value_rowcol(oldatt_, True)
-        _print_old_attempted(analytics_df, rowcols)
+        _print_old_attempted(analytics_df, analytics_html, rowcols)
         ### new attempts
         newatt_ = (newatttab & changetab)
         rowcols = _get_value_rowcol(newatt_, True)
-        _print_new_attempted(analytics_df, rowcols)
+        _print_new_attempted(analytics_df, analytics_html, rowcols)
     analytics_df.to_pickle(oldpath)
     
 def _check_login(driver):
@@ -331,13 +371,26 @@ def _manually_check():
         code = fp.read()
     exec(code, globals())
     
+    if os.path.exists(OLDPICKLEPATH):
+        os.remove(OLDPICKLEPATH)
     ### start!
-    driver = _start_webdriver(BROWSER, DRIVERPATH)
+    if not OPEN_WITH_CACHE:
+        driver = _start_webdriver(BROWSER, DRIVERPATH)
+    elif BROWSER.lower() == 'chrome':
+        _open_browser_cmd(PORT, CACHE_DIR)
+        driver = _connect_selenium(DRIVERPATH, PORT, CACHE_DIR)
+    else:
+        raise NotImplementedError('NOT IMPLEMENTED')
+        
     driver.get(EDURL)
     wait = input('Please wait till the webpage responds!')
     while _check_login(driver):
         status_code = input('Please Log in Ed first!!!'.center(70, '+'))
         
+    print(f'The Tutorial Code is {TUTCODE}')
+    # tutnew = input("Input the new TUTCODE if it is not correct, or press enter")
+    # if tutnew:
+    #     TUTCODE = tutnew
     ### starting the loop!
     break_sign = ''
     while break_sign != 'q':
@@ -346,12 +399,12 @@ def _manually_check():
         _search_tut(inputbox, TUTCODE)
         
         ### get analytics dataframe
-        while not _check_search_loaded(driver):
+        while not _check_search_loaded(driver, TUTCODE):
             sleep(1)
-        analytics_df, colattrs = _get_analytics_table(driver)
+        analytics_df, analytics_html, colattrs = _get_analytics_table(driver)
         stats, colnames = _prepare_code_plotting(analytics_df, colattrs)
         _plot_code_status(stats, colnames)
-        _compare_analytics_dfs(analytics_df, OLDPICKLEPATH)
+        _compare_analytics_dfs(analytics_df, analytics_html, OLDPICKLEPATH)
         
         break_sign = input('Type "q" to quit! Press Enter to continue! ')
         print('\n\n')
@@ -361,7 +414,8 @@ def _manually_check():
         os.remove(OLDPICKLEPATH)
         os.remove('./Class_status.png')
         
-    print('Have a nice day!'.center(70, '-'))
+    print('Thanks for using!'.center(70, '-'))
     
 if __name__ == '__main__':
+    # pass
     _manually_check()

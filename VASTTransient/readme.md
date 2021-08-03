@@ -4,7 +4,7 @@ This code is based on either `vastpipeline` result or `vasttools` query result.
 
 <hr>
 
-###Basic Usage
+### Basic Usage
 #### `PipelineSource`
 
 Use this class if you want to get a multiwavelength webpage based on vast-pipeline results.

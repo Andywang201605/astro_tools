@@ -5,3 +5,6 @@ casa -c 04_casa_calmod.py
 casa -c 05_casa_applycal.py
 casa -c 06_casa_split.py
 casa -c 07_casa_flag_targets.py
+
+rm casa*.log
+rm *.last
